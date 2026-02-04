@@ -198,8 +198,9 @@ router.post("/upload", auth, upload.single("file"), async (req, res) => {
           aiSummary = await analyzeReportImage(req.file.buffer, req.file.mimetype);
         }
       } catch (e) {
-        console.error("AI ERROR:", e.message);
-        aiSummary = "AI processing error.";
+        console.error("AI ERROR:", e);
+        // Surface the API error to the saved summary so users see the actual cause
+        aiSummary = e?.message || e || "AI processing error.";
       }
     }
 
