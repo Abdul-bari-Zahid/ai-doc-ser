@@ -6,8 +6,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/userRoutes.js";
-import reportRoutes from "./routes/reportRoutes.js";
-import vital from "./routes/vital.js";
+import billRoutes from "./routes/billRoutes.js";
+import billSuggestionRoutes from "./routes/billSuggestionRoutes.js";
 dotenv.config();
 const app = express();
 
@@ -17,8 +17,8 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/reports", reportRoutes);
-app.use("/api/vitals", vital);
+app.use("/api/bills", billRoutes);
+app.use("/api/bill-suggestions", billSuggestionRoutes);
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {

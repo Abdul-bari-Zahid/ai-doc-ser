@@ -2,7 +2,7 @@ import express from "express";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import dotenv from "dotenv";  
+import dotenv from "dotenv";
 dotenv.config();
 const router = express.Router();
 
@@ -18,7 +18,17 @@ router.post("/register", async (req, res) => {
 
     const user = await User.create({ name, email, password: hashed });
 
-    res.json({ message: "User registered", user });
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      message: "User registered",
+      token,
+      user: { id: user._id, name: user.name, email: user.email }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -38,11 +48,11 @@ router.post("/login", async (req, res) => {
     // const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
     //   expiresIn: "7d",
     // });
- const token = jwt.sign(
-  { id: user._id, email: user.email },
-  process.env.JWT_SECRET,
-  { expiresIn: "7d" }
-);
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     res.json({
       message: "Login success",

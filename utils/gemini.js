@@ -1,180 +1,192 @@
-
 // utils/gemini.js
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
+import fs from "fs";
 dotenv.config();
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-if (!GEMINI_API_KEY) {
-  console.warn("⚠️ GEMINI_API_KEY/GOOGLE_API_KEY not set. AI features will be disabled.");
-}
-const genAI = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
 
-// 🧾 TEXT REPORT AI
-export async function analyzeReportText(text) {
+function logError(msg, err) {
+  const logMsg = `[${new Date().toISOString()}] ${msg}: ${err.message}\n${err.stack}\n\n`;
   try {
-    if (!genAI) {
-      throw new Error("GenAI client not initialized (missing API key).");
+    fs.appendFileSync("ai-errors.log", logMsg);
+  } catch (e) {
+    console.error("Failed to write to log file", e);
+  }
+  console.error(msg, err);
+}
+
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
+const MODEL_NAME = "gemini-2.5-flash";
+
+async function generateWithRetry(model, prompt, isImage = false, buffer = null, mimetype = null) {
+  let retries = 3;
+  console.log("🔄 generateWithRetry - isImage:", isImage);
+
+  while (retries > 0) {
+    try {
+      const parts = isImage ? [{ text: prompt }, { inlineData: { data: buffer.toString("base64"), mimeType: mimetype } }] : prompt;
+      console.log("📤 Sending request to Gemini...");
+
+      const result = await model.generateContent(parts);
+      console.log("📥 Result object keys:", Object.keys(result));
+
+      const response = result.response;
+      console.log("📥 Response object keys:", Object.keys(response));
+      console.log("📥 Response candidates:", response.candidates?.length);
+
+      // Try to get text from response
+      let text = "";
+      try {
+        if (typeof response.text === 'function') {
+          text = response.text();
+        } else if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
+          text = response.candidates[0].content.parts[0].text;
+        }
+      } catch (e) {
+        console.log("⚠️ Error extracting text:", e.message);
+      }
+
+      console.log("✅ Response text length:", text?.length);
+      if (text && text.length > 0) {
+        console.log("📝 First 200 chars:", text.substring(0, 200));
+        return text;
+      } else {
+        console.log("❌ Empty response, full response:", JSON.stringify(response, null, 2));
+        return null;
+      }
+    } catch (err) {
+      console.log("❌ Error in generateWithRetry:", err.message);
+      if (err.message.includes("429") && retries > 1) {
+        console.log(`⏳ Rate limited. Retrying in 2s... (${retries - 1} left)`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        retries--;
+      } else {
+        throw err;
+      }
     }
+  }
+  return null;
+}
+
+// 🧾 BILL TEXT AI
+export async function analyzeBillText(text) {
+  try {
+    if (!genAI) throw new Error("GenAI client not initialized.");
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME }, { apiVersion: "v1beta" });
 
     const prompt = `
-You are a medical lab report analysis AI.
-
-Return output ONLY in this markdown format:
-
-## 📄 Report Summary
-- <2 line brief summary>
-
-## 🧪 Key Findings
-- Hemoglobin: xx (Low/Normal/High)
-- PCV: xx (Low/Normal/High)
-- Platelets: xx (Low/Normal/High)
-- Other key values if present
-
-## 🚨 Possible Health Risks
-- ...
-
-## 🩺 Suggested Actions
-- ...
-- ...
-- ...
-
-## ⚠️ Severity
-Low / Medium / High
-
-### ❗ Disclaimer
-AI generated. Consult a doctor.
-
-Analyze this report:
+You are a Bill Analysis AI. Return output ONLY in JSON format:
+{
+  "billType": "Electricity/Water/Gas/Internet/Phone/Other",
+  "billDate": "YYYY-MM-DD",
+  "totalAmount": 0.00,
+  "currency": "USD",
+  "taxes": [{"name": "Name", "amount": 0.00}],
+  "summary": "Overview",
+  "analysis": "Specific details",
+  "suggestions": ["Step 1", "Step 2"],
+  "graphData": {
+    "labels": ["L1", "L2"],
+    "datasets": [{"label": "Cost Breakdown", "data": [1, 2]}]
+  }
+}
+Analyze this bill:
 ${text}
 `;
 
-    const response = await genAI.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt
-    });
-
-    return response.text ?? (response?.outputs?.[0]?.text) ?? "AI returned no text.";
-
-  } catch (err) {
-    console.error("Text AI error:", err);
-    return "AI analysis failed.";
-  }
-} 
-
-
-// 🖼️ IMAGE REPORT AI
-export async function analyzeReportImage(buffer, mimetype) {
-  try {
-    if (!buffer || buffer.length < 100) {
-      return "❌ Invalid image file. Upload again.";
-    }
-
-    if (!genAI) {
-      throw new Error("GenAI client not initialized (missing API key).");
-    }
-
-    const base64Image = buffer.toString("base64");
-
-    const prompt = `
-You are a medical lab report analysis AI.
-
-Return only markdown in this format:
-
-### Report Summary
-- 1–2 line high-level summary
-
-### Key Findings
-- Test: value (Low/Normal/High)
-
-### Possible Health Risks
-- ...
-
-### Suggested Actions
-- ...
-- ...
-- ...
-
-### Severity
-Low / Medium / High
-
-### Disclaimer
-AI generated. Consult a doctor.
-`;
-
-    console.debug("Image AI request: mime=", mimetype, "size=", buffer.length);
+    const resultText = await generateWithRetry(model, prompt);
 
     try {
-      // Use ``contents`` with inlineData parts for image + text (required shape)
-      const response = await genAI.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { inlineData: { data: base64Image, mimeType: mimetype } },
-              { text: prompt }
-            ]
-          }
-        ]
-      });
-
-      // SDK may return .text or .outputs[0].text depending on version
-      const text = response.text ?? (response?.outputs?.[0]?.text);
-      if (text) return text;
-
-      console.warn("models.generateContent returned no text, inspecting full response:", response);
-
-    } catch (primaryErr) {
-      console.warn("models.generateContent failed for image (will try interactions API):", primaryErr);
-      // continue to interactions fallback
+      const jsonStr = resultText.match(/\{[\s\S]*\}/)?.[0];
+      if (jsonStr) return JSON.parse(jsonStr);
+    } catch (e) {
+      console.warn("JSON parse failed", e);
     }
-
-    // Fallback: attempt interactions API which handles multimodal input reliably
-    try {
-      const interaction = await genAI.interactions.create({
-        model: "gemini-2.5-flash",
-        input: [
-          { type: "image", data: base64Image, mime_type: mimetype },
-          { type: "text", text: prompt }
-        ]
-      });
-
-      console.debug("Interactions API response:", interaction);
-
-      const texts = [];
-      for (const out of interaction.outputs ?? []) {
-        if (out.type === "text" && out.text) texts.push(out.text);
-        if (out.type === "message" && out.text) texts.push(out.text);
-        if (out.type === "function_call" && out.arguments) texts.push(JSON.stringify(out.arguments));
-      }
-
-      if (texts.length) return texts.join("\n\n");
-
-      console.warn("Interactions API returned no text outputs", interaction);
-      return "AI returned no text.";
-
-    } catch (interactionErr) {
-      console.error("❌ Image AI error (interactions fallback):", interactionErr);
-      if (interactionErr?.status) console.error("status:", interactionErr.status);
-      if (interactionErr?.message) console.error("message:", interactionErr.message);
-      const apiMsg = interactionErr?.error?.message ?? interactionErr?.message ?? "Unable to process image";
-      return `Error analyzing image report: ${apiMsg}`;
-    }
-
+    return resultText;
   } catch (err) {
-    console.error("❌ Image AI error (final):", err);
-    if (err?.status) console.error("Status:", err.status);
-    if (err?.details) console.error("Details:", err.details);
-    const apiMsg = err?.error?.error?.message ?? err?.message ?? "Unknown error";
-    return `Error analyzing image report: ${apiMsg}`;
+    logError("Bill Text AI error", err);
+    return null;
   }
 }
 
-export default { analyzeReportText, analyzeReportImage };
+// 🖼️ BILL IMAGE AI
+export async function analyzeBillImage(buffer, mimetype) {
+  try {
+    console.log("📸 analyzeBillImage called");
+    console.log("- Buffer size:", buffer?.length, "bytes");
+    console.log("- Mimetype:", mimetype);
 
+    if (!buffer || buffer.length < 100) {
+      console.log("❌ Buffer too small or missing");
+      return null;
+    }
 
+    if (!genAI) {
+      console.log("❌ GenAI client not initialized");
+      throw new Error("GenAI client not initialized.");
+    }
 
+    console.log("✅ Creating model:", MODEL_NAME);
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME }, { apiVersion: "v1beta" });
 
+    const prompt = `Analyze this bill image and extract the following information in JSON format:
+{
+  "billType": "Electricity/Water/Gas/Internet/Phone/Other",
+  "billDate": "YYYY-MM-DD",
+  "totalAmount": <number>,
+  "currency": "PKR or USD",
+  "taxes": [{"name": "tax name", "amount": <number>}],
+  "summary": "Brief overview of the bill",
+  "analysis": "Detailed analysis",
+  "suggestions": ["Suggestion 1", "Suggestion 2"]
+}
 
+Extract the total amount, bill type, date, and all charges/taxes. Return ONLY valid JSON.`;
 
+    console.log("🚀 Calling Gemini API...");
+    const resultText = await generateWithRetry(model, prompt, true, buffer, mimetype);
+    console.log("✅ API Response received, length:", resultText?.length);
+
+    if (resultText && resultText.length > 0) {
+      const jsonStr = resultText.match(/\{[\s\S]*\}/)?.[0];
+      if (jsonStr) {
+        const parsed = JSON.parse(jsonStr);
+        console.log("✅ JSON parsed successfully");
+        console.log("📊 Total amount:", parsed.totalAmount);
+        return parsed;
+      }
+      console.log("⚠️ No JSON found in response");
+      return null;
+    }
+
+    console.log("❌ No result text from API");
+    return null;
+  } catch (err) {
+    logError("Bill Image AI error", err);
+    console.log("❌ Full error:", err.message);
+    return null;
+  }
+}
+
+// 🔮 GENERAL AI TASK
+export async function analyzeWithGemini(prompt) {
+  try {
+    if (!genAI) throw new Error("GenAI client not initialized.");
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME }, { apiVersion: "v1beta" });
+
+    const resultText = await generateWithRetry(model, prompt);
+
+    try {
+      const jsonStr = resultText.match(/\{[\s\S]*\}/)?.[0];
+      if (jsonStr) return JSON.parse(jsonStr);
+    } catch (e) { }
+
+    return resultText;
+  } catch (err) {
+    logError("Gemini General AI error", err);
+    return null;
+  }
+}
+
+export default { analyzeBillText, analyzeBillImage, analyzeWithGemini };
