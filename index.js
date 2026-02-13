@@ -21,6 +21,25 @@ import dietRoutes from "./routes/dietRoutes.js";
 
 dotenv.config();
 
+// --- ENV VAR CHECK ---
+console.log("🔍 Checking Environment Variables...");
+if (!process.env.MONGO_URI) {
+  console.error("❌ FATAL: MONGO_URI is not defined.");
+} else {
+  console.log("✅ MONGO_URI is defined.");
+}
+
+if (!process.env.JWT_SECRET) {
+  console.error("❌ FATAL: JWT_SECRET is not defined.");
+} else {
+  console.log("✅ JWT_SECRET is defined.");
+}
+
+if (!process.env.GEMINI_API_KEY) {
+  console.warn("⚠️ WARNING: GEMINI_API_KEY is not defined. AI features will fail.");
+}
+// ---------------------
+
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });
