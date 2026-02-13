@@ -10,13 +10,20 @@ const router = express.Router();
 
 router.get("/dashboard", auth, async (req, res) => {
   try {
+    console.log("Dashboard: Fetching user for ID:", req.user.id);
     const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      console.log("Dashboard: User not found in DB");
+      return res.status(404).json({ message: "User not found" });
+    }
+    console.log("Dashboard: User found:", user.email);
     res.json({
       message: "Welcome to dashboard",
       user: user,
     });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch user" });
+    console.error("Dashboard Error:", err);
+    res.status(500).json({ error: "Failed to fetch user", details: err.message });
   }
 });
 
