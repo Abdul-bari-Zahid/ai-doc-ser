@@ -44,7 +44,7 @@ router.post("/add", auth, async (req, res) => {
       sugar,
       weight,
       notes,
-      aiResult: aiResult.summary,
+      aiResult: aiResult.summary || "Health analysis processed successfully.",
       structuredData: aiResult,
       language
     });

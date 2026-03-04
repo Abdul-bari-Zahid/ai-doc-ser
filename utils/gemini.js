@@ -135,21 +135,67 @@ export async function analyzeReportText(text, language = "English", country = "P
     const model = genAI.getGenerativeModel({ model: MODEL_NAME }, { apiVersion: "v1beta" });
 
     const prompt = `
-You are a Distinguished Medical Consultant and Senior Diagnostic Pathologist with 30+ years of experience. 
-Analyze the following lab report. Focus on ${country} availability for medicines.
-Output ONLY JSON:
+You are a Distinguished Medical Consultant and Senior Diagnostic Pathologist with 30+ years of experience.
+Analyze the following lab report text.
+Context: Patient is in ${country}. Language: ${language}.
+Suggest ONLY those medicines (brands/generics) that are EMINENTLY AVAILABLE and COMMON in ${country}. Prioritize trusted local brands.
+
+IMPORTANT: Return the output PURELY as a valid JSON object. Do not include any markdown formatting (like \`\`\`json).
+
+Required JSON Structure:
 {
-  "summary": "2-line summary",
-  "keyFindings": [{"test": "Name", "value": "Value", "unit": "Unit", "status": "Low/Normal/High"}],
-  "healthRisks": [],
-  "suggestedActions": [],
-  "severity": "Low/Medium/High",
-  "recommendations": [],
-  "medicineSuggestions": [{"name": "Name", "formula": "Formula", "purpose": "Why", "link": "link"}],
-  "disclaimer": "AI generated."
+  "report_type": "Specific Report Name",
+  "patient_information": {
+    "name": "Name or null",
+    "age": "Age or null",
+    "sex": "Sex or null",
+    "registration_number": "ID or null",
+    "referred_by": "Doctor Name or null"
+  },
+  "report_details": {
+    "lab_name": "Lab Name or null",
+    "registered_on": "Date/Time or null",
+    "collected_on": "Date/Time or null",
+    "reported_on": "Date/Time or null"
+  },
+  "test_results": [
+    {
+      "test_name": "Test Name",
+      "value": "Numeric/String Value",
+      "numeric_value": 0.0, // Extract numeric value for graphing, or null if not applicable
+      "unit": "Unit",
+      "reference_range": "Range",
+      "status": "Low/Normal/High/Critical",
+      "flag": "L/H/C or null"
+    }
+  ],
+  "interpretation_summary": {
+    "overall_status": "Normal/Abnormal/Critical",
+    "abnormal_findings": [
+      {
+        "parameter": "Test Name",
+        "value": "Measured Value",
+        "status": "High/Low",
+        "clinical_significance": "Short explanation"
+      }
+    ],
+    "normal_findings": ["List of normal parameters"]
+  },
+  "clinical_notes_from_lab": ["Note 1", "Note 2"],
+  "diagnostic_pathologist_analysis": {
+    "key_findings": ["Bullet point 1", "Bullet point 2"],
+    "differential_diagnosis": ["Diagnosis 1", "Diagnosis 2"],
+    "recommendations": ["Rec 1", "Rec 2"]
+  },
+  "medicineSuggestions": [
+    { 
+      "name": "Brand Name (e.g. Panadol)", 
+      "formula": "Chemical Formula (e.g. Paracetamol)", 
+      "purpose": "Brief reason for suggestion", 
+      "link": "https://www.drugs.com/search.php?searchterm=Medicine+Name" // Provide a valid search URL or official link
+    }
+  ]
 }
-Report Text:
-${text}
 `;
     const resultText = await generateWithRetry(model, prompt);
     const jsonStr = resultText?.match(/\{[\s\S]*\}/)?.[0];
@@ -166,9 +212,68 @@ export async function analyzeReportImage(buffer, mimetype, language = "English",
     const model = genAI.getGenerativeModel({ model: MODEL_NAME }, { apiVersion: "v1beta" });
 
     const prompt = `
-You are a Senior Diagnostic Pathologist. Analyze this medical report image.
-Context: Patient is in ${country}. Use ${language}.
-Return ONLY JSON following the standard medical analysis schema.
+You are a Senior Diagnostic Pathologist.
+Analyze this medical report image.
+Context: Patient is in ${country}. Language: ${language}.
+Suggest ONLY those medicines (brands/generics) that are EMINENTLY AVAILABLE and COMMON in ${country}. Prioritize trusted local brands.
+
+IMPORTANT: Return the output PURELY as a valid JSON object. Do not include any markdown formatting.
+Ensure "numeric_value" is a JSON number (not string) for graphing.
+
+Required JSON Structure:
+{
+  "report_type": "Specific Report Name",
+  "patient_information": {
+    "name": "Name or null",
+    "age": "Age or null",
+    "sex": "Sex or null",
+    "registration_number": "ID or null",
+    "referred_by": "Doctor Name or null"
+  },
+  "report_details": {
+    "lab_name": "Lab Name or null",
+    "registered_on": "Date/Time or null",
+    "collected_on": "Date/Time or null",
+    "reported_on": "Date/Time or null"
+  },
+  "test_results": [
+    {
+      "test_name": "Test Name",
+      "value": "Numeric/String Value",
+      "numeric_value": 0.0, // Extract numeric value for graphing. EXAMPLE: if value is "15 g/dL", this is 15.
+      "unit": "Unit",
+      "reference_range": "Range",
+      "status": "Low/Normal/High/Critical",
+      "flag": "L/H/C or null"
+    }
+  ],
+  "interpretation_summary": {
+    "overall_status": "Normal/Abnormal/Critical",
+    "abnormal_findings": [
+      {
+        "parameter": "Test Name",
+        "value": "Measured Value",
+        "status": "High/Low",
+        "clinical_significance": "Short explanation"
+      }
+    ],
+    "normal_findings": ["List of normal parameters"]
+  },
+  "clinical_notes_from_lab": ["Note 1", "Note 2"],
+  "diagnostic_pathologist_analysis": {
+    "key_findings": ["Bullet point 1", "Bullet point 2"],
+    "differential_diagnosis": ["Diagnosis 1", "Diagnosis 2"],
+    "recommendations": ["Rec 1", "Rec 2"]
+  },
+  "medicineSuggestions": [
+    { 
+      "name": "Brand Name (e.g. Panadol)", 
+      "formula": "Chemical Formula (e.g. Paracetamol)", 
+      "purpose": "Brief reason for suggestion", 
+      "link": "https://www.drugs.com/search.php?searchterm=Medicine+Name" // Provide a valid search URL or official link
+    }
+  ]
+}
 `;
     const resultText = await generateWithRetry(model, prompt, true, buffer, mimetype);
     const jsonStr = resultText?.match(/\{[\s\S]*\}/)?.[0];
@@ -185,9 +290,41 @@ export async function analyzeVitals(vitals, language = "English", country = "Pak
     const model = genAI.getGenerativeModel({ model: MODEL_NAME }, { apiVersion: "v1beta" });
 
     const prompt = `
-Analyze patient vitals: BP: ${vitals.bp}, Sugar: ${vitals.sugar}, Weight: ${vitals.weight}.
-Language: ${language}, Country: ${country}.
-Return JSON.
+You are a Senior Medical Consultant.
+Analyze these patient vitals:
+- Blood Pressure: ${vitals.bp}
+- Blood Sugar: ${vitals.sugar} mg/dL
+- Weight: ${vitals.weight} kg
+- Notes: ${vitals.notes || "None"}
+
+Context: Language: ${language}, Country: ${country}.
+
+IMPORTANT: Return the output PURELY as a valid JSON object. Do not include any markdown formatting.
+
+Required JSON Structure:
+{
+  "summary": "Short clinical summary of the user's status.",
+  "analysis": {
+    "overall_status": "Normal/At Risk/Critical",
+    "bp_assessment": "Assessment of BP",
+    "sugar_assessment": "Assessment of Sugar",
+    "weight_assessment": "Assessment of Weight"
+  },
+  "keyFindings": [
+    { "test": "Blood Pressure", "value": "${vitals.bp}", "numericValue": 0, "status": "Low/Normal/High", "unit": "mmHg" }, // Extract systolic as numericValue for graphing if possible, or just 0
+    { "test": "Sugar", "value": "${vitals.sugar}", "numericValue": ${vitals.sugar}, "status": "Low/Normal/High", "unit": "mg/dL" },
+    { "test": "Weight", "value": "${vitals.weight}", "numericValue": ${vitals.weight}, "status": "Normal/Overweight/Underweight", "unit": "kg" }
+  ],
+  "recommendations": ["Rec 1", "Rec 2"],
+  "medicineSuggestions": [
+    { 
+      "name": "Best available Medicine Name in ${country}", 
+      "formula": "Generic Formula", 
+      "purpose": "Reason for suggestion", 
+      "link": "https://www.drugs.com/search.php?searchterm=Medicine+Name" 
+    }
+  ]
+}
 `;
     const resultText = await generateWithRetry(model, prompt);
     const jsonStr = resultText?.match(/\{[\s\S]*\}/)?.[0];

@@ -45,7 +45,7 @@ router.post("/upload", auth, upload.single("file"), async (req, res) => {
       fileUrl: cloudRes.secure_url,
       reportType,
       reportDate,
-      aiSummary: aiResult.summary || JSON.stringify(aiResult),
+      aiSummary: aiResult.summary || aiResult.interpretation_summary?.overall_status || "Report analysis complete.",
       structuredData: aiResult,
       language: language,
     });

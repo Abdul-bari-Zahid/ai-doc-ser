@@ -1,0 +1,20 @@
+[2026-03-04T19:49:51.326Z] Vitals AI error: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [403 Forbidden] Your API key was reported as leaked. Please use another API key.
+Error: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [403 Forbidden] Your API key was reported as leaked. Please use another API key.
+    at handleResponseNotOk (file:///E:/hackathon%20-%20grand/server/node_modules/@google/generative-ai/dist/index.mjs:432:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async makeRequest (file:///E:/hackathon%20-%20grand/server/node_modules/@google/generative-ai/dist/index.mjs:401:9)
+    at async generateContent (file:///E:/hackathon%20-%20grand/server/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWithRetry (file:///E:/hackathon%20-%20grand/server/utils/gemini.js:34:22)
+    at async analyzeVitals (file:///E:/hackathon%20-%20grand/server/utils/gemini.js:329:24)
+    at async file:///E:/hackathon%20-%20grand/server/routes/vital.js:34:20
+
+[2026-03-04T19:50:00.630Z] Vitals AI error: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [403 Forbidden] Your API key was reported as leaked. Please use another API key.
+Error: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [403 Forbidden] Your API key was reported as leaked. Please use another API key.
+    at handleResponseNotOk (file:///E:/hackathon%20-%20grand/server/node_modules/@google/generative-ai/dist/index.mjs:432:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async makeRequest (file:///E:/hackathon%20-%20grand/server/node_modules/@google/generative-ai/dist/index.mjs:401:9)
+    at async generateContent (file:///E:/hackathon%20-%20grand/server/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWithRetry (file:///E:/hackathon%20-%20grand/server/utils/gemini.js:34:22)
+    at async analyzeVitals (file:///E:/hackathon%20-%20grand/server/utils/gemini.js:329:24)
+    at async file:///E:/hackathon%20-%20grand/server/routes/vital.js:34:20
+
